@@ -1,0 +1,21 @@
+{
+  "name": "csv-sniffer",
+  "version": "0.0.0",
+  "description": "Takes a sample of CSV text and tries to guess newline character, col delimiter, quote character, and whether or not the first row in the file contains labels",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MonetDB/npm-csv-sniffer"
+  },
+  "keywords": [
+    "csv",
+    "sniffer",
+    "data",
+    "import"
+  ],
+  "author": "R. Cijvat",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MonetDB/npm-csv-sniffer/issues"
+  }
+}
