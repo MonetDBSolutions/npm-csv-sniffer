@@ -37,8 +37,7 @@ are attempted to be auto detected. Possible options:
 - newlineStr: Line separator in sample
 - delimiter: Column delimiter in sample (null or )
 - quoteChar: Quoting character in sample (null or empty string means no quote character)
-- hasHeader: Boolean indicating whether or not the first line in sample
-             contains header labels.
+- hasHeader: Boolean indicating whether or not the first line in sample contains header labels.
              
 Returns object with the same properties as those found in the input, 
 auto filled in whenever they were missing. Whenever auto detection failed,
@@ -48,3 +47,5 @@ Furthermore, a types array is in the output, denoting the detected types of the 
 Also, a warning array is added in the output, possibly containing information
 on mismatches found during the sniffing between the supplied input and
 what was found during the sniffing.
+
+**Please report any suggestions/bugs to robin.cijvat@monetdbsolutions.com**
