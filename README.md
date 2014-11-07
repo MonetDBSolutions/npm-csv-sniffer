@@ -1,4 +1,7 @@
 # csv-sniffer
+[![Build Status](https://travis-ci.org/MonetDB/npm-csv-sniffer.svg)](https://travis-ci.org/MonetDB/npm-csv-sniffer)
+[![npm version](https://badge.fury.io/js/csv-sniffer.svg)](http://badge.fury.io/js/csv-sniffer)
+
 Takes a sample of CSV text and tries to guess newline character, col delimiter, quote character, and whether or not the first row in the file contains labels.
 
 # Installation
