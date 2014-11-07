@@ -54,12 +54,14 @@ function guessQuoteAndDelimiter(sample, newlineStr, delimiters) {
     var nl = newlineStr.replace("\n", "\\n").replace("\r", "\\r");
 
     // Add regexp for quotes + delimiter on both sides
+    var delimiter = "([^"+nl+"\"'])";
+    var content = "[^"+nl+"]*?";
     exprs.push({
     	expr: new RegExp(
-		    	"([^"+nl+"\"'])"	+ // Delimiter
+		    	delimiter			+ // Delimiter
 		    	"\\s*?"				+ // Possible whitespace between delimiter and quote char
 		    	"([\"'])"			+ // Quote character
-		    	"[^"+nl+"]*?"		+ // Non-greedy parsing of string between quotes
+		    	content				+ // Non-greedy parsing of string between quotes
 		    	"\\2"				+ // Matching quote character
 		    	"\\s*?"				+ // Possible whitespace between quote char and delimiter
 		    	"\\1"				  // Matching delimiter
@@ -74,11 +76,11 @@ function guessQuoteAndDelimiter(sample, newlineStr, delimiters) {
 		    	"^"					+ // Start of line (note that javascript treats the start of every line as ^)
 		    	"\\s*?"				+ // Possible whitespace at start of line
 		    	"([\"'])"			+ // Quote character
-		    	"[^"+nl+"]*?"		+ // Non-greedy parsing of string between quotes
+		    	content				+ // Non-greedy parsing of string between quotes
 		    	"\\1"				+ // Matching quote character
 		    	"\\s*?"				+ // Possible whitespace between quote char and delimiter
-		    	"([^"+nl+"\"'])"	  // Delimiter
-	    	, "gm"),
+		    	delimiter			  // Delimiter
+	    	, "g"),
 		delimRef: 2,
 		quoteRef: 1
 	});
@@ -86,31 +88,31 @@ function guessQuoteAndDelimiter(sample, newlineStr, delimiters) {
 	// Add regexp for quotes + delimiter on the left side
 	exprs.push({
 		expr: new RegExp(
-		    	"([^"+nl+"\"'])"	+ // Delimiter
+		    	delimiter			+ // Delimiter
 		    	"\\s*?"				+ // Possible whitespace between delimiter and quote char
 		    	"([\"'])"			+ // Quote character
-		    	"[^"+nl+"]*?"		+ // Non-greedy parsing of string between quotes
+		    	content				+ // Non-greedy parsing of string between quotes
 		    	"\\2"				+ // Matching quote character
 		    	"\\s*?"				+ // Possible whitespace between quote char and end of line
 		    	"$"					  // End of line (note that javascript treats the end of every line as $)
-	    	, "gm"),
+	    	, "g"),
 		delimRef: 1,
 		quoteRef: 2
 	});
 
 	// Add regexp for just quotes
-	exprs.push({
+	/*exprs.push({
 		expr: new RegExp(
 		    	"^"					+ // Start of line (note that javascript treats the start of every line as ^)
 		    	"\\s*?"				+ // Possible whitespace at start of line
 		    	"([\"'])"			+ // Quote character
-		    	"[^"+nl+"]*?"		+ // Non-greedy parsing of string between quotes
+		    	content				+ // Non-greedy parsing of string between quotes
 		    	"\\1"				+ // Matching quote character
 		    	"\\s*?"				+ // Possible whitespace between quote char and end of line
 		    	"$"					  // End of line (note that javascript treats the end of every line as $)
-	    	, "gm"),
+	    	, "g"),
 		quoteRef: 1
-	});
+	});*/
 
 	var matches = [];
 
@@ -510,6 +512,9 @@ module.exports = function() {
 	// what was found during the sniffing.
 
 	CSVSniffer.prototype.sniff = function(sample, options) {
+		if(!options) {
+			var options = {};
+		}
 		var result = {};
 		result.warnings = [];
 		result.newlineStr = options.newlineStr || getNewlineStr(sample);

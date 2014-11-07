@@ -29,7 +29,7 @@ The constructor of a CSV sniffer takes one optional argument: an array of possib
 Auto detection will never propose a character outside of this set. If delims is not provided, auto detection
 might find any ASCII character to be a delimiter.
 
-#### CSVSniffer.sniff(sample, options)
+#### CSVSniffer.sniff(sample, [options])
 This function is the only function in the CSVSniffer object. It operates based on the
 given options in the optional options object. Options that are not provided
 are attempted to be auto detected. Possible options:
