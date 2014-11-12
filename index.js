@@ -10,28 +10,124 @@
  * and we implemented some things that we did need but were not yet in the Python CSV sniffer.
  * Major differences:
  *    Our sniffer does not calculate doublequote and skipinitialwhitespace
- *    Our sniffer also retrieves the newline character as one of [\r\n, \n\r, \n, \r] (in this order)
+ *    Our sniffer also retrieves the newline character as one of [\r\n, \n\r, \n, \r] in a clever way
  *    Our sniffer improves the performance of the delimiter guesser by not traversing every line of the
  *    input for every ASCII character, but rather traversing every line once and incrementing a corresponding
  *    counter for every encountered character.
  *	  We implement a smarter voting mechanism in the hasHeader check. We also accept give header +1 when
  *    the length of the header column is within some tolerance depending on standard deviation of all 
  *    lengths inside this column.
+ *	  Our sniffer passes back labels and records
  */
 
 
 var fs = require('fs');
 
 function getNewlineStr(sample) {
-	// Checks the occurrences of possible row delimiters. If multiple row delimiters occur, we fail.
-	// The first row delimiter that we find wins
-	var winner = null;
-	["\r\n", "\n\r", "\n", "\r"].some(function(d) {
-		if(sample.indexOf(d) > -1) {
-			winner = d;
-			return true;
+	// Figures out what the most probable row delimiter is. 
+	// It does this by registering the line lengths that would arise if a row delimiter
+	// would be used. If there is exactly one candidate, this candidate wins.
+	// Otherwise, if there is exactly one candidate that causes > n lines, this one wins. This
+	// is built in to prevent candidates with just a couple of lines challenging ones with many
+	// lines, since if we have a candidate with 2 and a candidate with 90 lines, it seems safe
+	// to assume the one with 90 lines always wins. Furthermore, doing statistics on very few lines
+	// is not safe anyway. 
+	// As a last resort, we have to give a solution for when we have more than one candidate
+	// with > n lines. We then calculate for every candidate the average and the standard
+	// deviation of the line lengths found. The winning candidate is the one with the 
+	// smallest normalized standard deviation.
+	var candidates = ["\r\n", "\n\r", "\n", "\r"];
+	var nrLines = {};
+
+	var lineLengths = {};
+	var threshold = 5; // at least this many lines
+
+	candidates.forEach(function(newlineStr) {
+		nrLines[newlineStr] = 1;
+		var l = [];
+		var curPos = 0;
+		while((newlinePos = sample.indexOf(newlineStr, curPos)) > -1) {
+			// update nr of lines
+			++nrLines[newlineStr];
+
+			var lineLength = newlinePos - curPos;
+			l.push(lineLength);
+			curPos = newlinePos + newlineStr.length;
 		}
-		return false;
+		lineLengths[newlineStr] = l;
+	});
+
+	// eliminate substrings of \r\n and \n\r whenever they have an equal amount of lines
+	["\r\n", "\n\r"].forEach(function(newlineStr) {
+		var nr = nrLines[newlineStr];
+		if(nr > 1) {
+			["\n", "\r"].forEach(function(newlineStr) {
+				if(nrLines[newlineStr] == nr) {
+					nrLines[newlineStr] = 1;
+				}
+			});
+		}
+	});
+
+	// make list of remaining candidates, which are the only ones with > 1 line
+	var remainingCandidates = [];
+	candidates.forEach(function(newlineStr) {
+		if(nrLines[newlineStr] > 1) {
+			remainingCandidates.push(newlineStr);
+		}
+	});
+
+	if(remainingCandidates.length == 0) {
+		return null;
+	}
+	if(remainingCandidates.length == 1) {
+		return remainingCandidates[0];
+	}
+
+	// > 1 remainers, make list of valid onces, which must have a nr lines > threshold
+	var finalRemainers = [];
+	var maxNrLines = 0;
+	remainingCandidates.forEach(function(newlineStr) {
+		var curNrLines = nrLines[newlineStr];
+		maxNrLines = Math.max(maxNrLines, curNrLines);
+		if(curNrLines > threshold) {
+			finalRemainers.push(newlineStr);
+		}
+	});
+
+	if(finalRemainers.length == 0) {
+		var winner = null;
+		// no newlinestrs with more than 'threshold' lines... return the one with the max nr of lines
+		remainingCandidates.some(function(newlineStr) {
+			if(nrLines[newlineStr] == maxNrLines) {
+				winner = newlineStr;
+				return true;
+			}
+			return false;
+		});
+		return winner;
+	}
+	if(finalRemainers.length == 1) {
+		return finalRemainers[0];
+	}
+
+	// Time for the final round with the > 1 remainers...
+	var winner = null;
+	var winnerScore = Infinity;
+	finalRemainers.forEach(function(newlineStr) {
+		var l = lineLengths[newlineStr];
+		var sum = 0;
+		l.forEach(function(d) { sum += d; });
+		var avg = sum / l.length;
+
+		var absSum = 0;
+		l.forEach(function(d) { absSum += Math.abs(d - avg); });
+		var score = absSum / l.length / avg; // this calculates absolute differences, normalized to # lines and length of lines
+
+		if(score < winnerScore) {
+			winnerScore = score;
+			winner = newlineStr;
+		}
 	});
 	return winner;
 }
@@ -101,7 +197,7 @@ function guessQuoteAndDelimiter(sample, newlineStr, delimiters) {
 	});
 
 	// Add regexp for just quotes
-	/*exprs.push({
+	exprs.push({
 		expr: new RegExp(
 		    	"^"					+ // Start of line (note that javascript treats the start of every line as ^)
 		    	"\\s*?"				+ // Possible whitespace at start of line
@@ -112,7 +208,7 @@ function guessQuoteAndDelimiter(sample, newlineStr, delimiters) {
 		    	"$"					  // End of line (note that javascript treats the end of every line as $)
 	    	, "g"),
 		quoteRef: 1
-	});*/
+	});
 
 	var matches = [];
 
@@ -308,45 +404,74 @@ function guessDelimiter(sample, newlineStr, delimiters) {
 	return delims[0];
 }
 
-function parseCSVline(line, delimiter, quotechar) {
-    // Parsing a line with a regexp to split the columns is tricky, due to
-    // the possibility of delimiters inside quoted fields, because the
-    // delimiter could be a whitespace character, because a delimiter
-    // within quotes can also seem to occur in between values, and many
-    // more annoying problems. Therefore, in this function we take another
-    // approach to parse a line of CSV. We just walk over the line and
-    // remember if we are inside quotes or not (i.e. we use a state machine).
-    // We do this in a simplistic way, e.g. we don't handle whitespace
-    // between delimiters and opening/closing quotes, we just add
-    // that to the values. This is perfectly fine, since for the 
-    // statistics this does not change a lot.
+function parseSample(sample, newlineStr, delimiter, quotechar) {
+	// Parse sample by creating a state machine to split lines (necessary because
+	// we don't want to split a line if we find a newline str inside a quoted field)
+	// Assumption of this function is that the quotechar is not contained inside the
+	// newlineStr. This would probably devastate the parsing, but is a safe assumption
+	// since it must be a really f*cked up format if the newline string contains the
+	// quotechar.
+	var lines = [];
+	if(!quotechar) {
+		// no quote char, simple!
+		lines = sample.split(newlineStr);
+		if(lines.length > 1) {
+			lines.pop(); //drop last element, since that can be an incomplete line
+		}
+		return lines.map(function(line) { return line.split(delimiter); });
+	}
 
-    // If no quotechar is given, our task is really easy
-    if(!quotechar) {
-    	return line.split(delimiter);
-    }
-
-    var vals = [];
+	// if we arrived here, it means the real deal: a quote char needs to be considered
+	var result = [];
+	var vals = [];
     var curVal = "";
     var insideQuotes = false;
-    for(var i=0; i<line.length; ++i) {
-    	var curchar = line.charAt(i);
-    	if(curchar == quotechar) {
-    		insideQuotes = !insideQuotes;
-    		continue;
+    var escape = false;
+    for(var i=0; i<sample.length; ++i) {
+    	var curchar = sample.charAt(i);
+    	if(!escape) {
+    		// only do all of the checks if curchar is not escaped
+	    	if(curchar == "\\") {
+	    		escape = true;
+	    		continue;
+	    	}
+	    	if(curchar == quotechar) {
+	    		insideQuotes = !insideQuotes;
+	    		continue;
+	    	}
+
+	    	if(!insideQuotes) {
+	    		// check if we are currently standing at a newline
+				var atNewline = true;
+				for(var j=0; j<newlineStr.length; ++j) {
+					if(sample.charAt(i+j) != newlineStr.charAt(j)) {
+						atNewline = false;
+						break;
+					}
+				}
+				if(atNewline || curchar == delimiter) {
+					vals.push(curVal);
+					curVal = "";
+					if(atNewline) {
+						if(vals[vals.length-1] == "") { // remove last item if it is completely empty
+							vals.pop();
+						}
+						result.push(vals);
+						vals = [];
+					}
+					continue;
+				}
+	    	}
     	}
-    	if(curchar == delimiter && !insideQuotes) {
-    		vals.push(curVal);
-    		curVal = "";
-    		continue;
-    	}
+    	escape = false;
     	curVal += curchar;
     }
-    vals.push(curVal);
-    return vals;
+    // after the loop, remaints might be in the vals array. We leave them there, since it is not considered
+    // a complete line if no newline was read after it
+    return result;
 }
 
-function getTypes(lines, delimiter, quotechar) {
+function getTypes(parsedSample) {
 	// Parses all lines in the lines array and determines the type of all the columns.
 	// Returns three type arrays:
 	// - Types considering all rows
@@ -372,8 +497,7 @@ function getTypes(lines, delimiter, quotechar) {
     var tail = [];
     var all = null; // will be calculated in the end
 
-    lines.forEach(function(line, i) {
-    	var cols = parseCSVline(line, delimiter, quotechar);
+    parsedSample && parsedSample.forEach(function(cols, i) {
     	if(i == 0) {
     		firstValues = cols;
     		cols.forEach(function(col, colIndex) {
@@ -395,7 +519,7 @@ function getTypes(lines, delimiter, quotechar) {
     });
 
     all = tail.slice(0); //copy and accumulate using the first values
-    firstValues.forEach(function(col, i) {
+    firstValues && firstValues.forEach(function(col, i) {
     	all[i] = getAccumulatedType(col, all[i]);
     });
 
@@ -406,7 +530,7 @@ function getTypes(lines, delimiter, quotechar) {
     };
 }
 
-function hasHeader(sample, newlineStr, delimiter, quotechar) {
+function hasHeader(parsedSample) {
 	// Figures out the types of data in each column. If any
     // column is of a single type (say, integers), *except* for the first
     // row, then the first row is presumed to be labels. If the type
@@ -415,15 +539,11 @@ function hasHeader(sample, newlineStr, delimiter, quotechar) {
     // rows except for the first are the same length, it's a header.
     // Finally, a 'vote' is taken at the end for each column, adding or
     // subtracting from the likelihood of the first row being a header.
-
-    // Split sample into lines
-    var lines = sample.split(newlineStr);
  
  	var firstValues = null;
     var lengthsTail = [];
 
-    lines.forEach(function(line, i) {
-    	var cols = parseCSVline(line, delimiter, quotechar);
+    parsedSample && parsedSample.forEach(function(cols, i) {
     	if(i == 0) {
     		// This is the possible header
     		firstValues = cols;
@@ -446,7 +566,7 @@ function hasHeader(sample, newlineStr, delimiter, quotechar) {
     	});
     });
 
-    var types = getTypes(lines, delimiter, quotechar);
+    var types = getTypes(parsedSample);
 	// All types and lengths are known, let every col bring out a vote.
 	// Whenever the type of the header col differs from the type of the rest of
 	// the column (and type of first row is string), this vote is +1. Otherwise, we use the values in the 
@@ -455,7 +575,7 @@ function hasHeader(sample, newlineStr, delimiter, quotechar) {
 	// average. Close to average means negative vote, far from average means positive
 	// vote.
 	var vote = 0;
-	firstValues.forEach(function(col, i) {
+	firstValues && firstValues.forEach(function(col, i) {
 		if(types.first[i] != types.tail[i] && types.first[i] == "string") {
 			// Yup, first row has different type
 			return ++vote;
@@ -493,23 +613,7 @@ module.exports = function() {
 		this.delimiters = delims;
 	}
 
-	// The only function in this module does everything, depending on the
-	// given options in the optional options object. Options that are not provided
-	// are attempted to be auto detected. Possible options:
-	// - newlineStr: Line separator in sample
-	// - delimiter: Column delimiter in sample (null or )
-	// - quoteChar: Quoting character in sample (null or empty string means no quote character)
-	// - hasHeader: Boolean indicating whether or not the first line in sample
-	//              contains header labels.
-	//
-	// Returns object with the same properties as those found in the input, 
-	// auto filled in whenever they were missing. Whenever auto detection failed,
-	// null values are filled in. Note that this could be perfectly fine for e.g. 
-	// the quote character. 
-	// Furthermore, a types array is in the output, denoting the detected types of the columns.
-	// Also, a warning array is added in the output, possibly containing information
-	// on mismatches found during the sniffing between the supplied input and
-	// what was found during the sniffing.
+	// Sniff the given sample, using the given options. See documentation for exact options.
 
 	CSVSniffer.prototype.sniff = function(sample, options) {
 		if(!options) {
@@ -539,17 +643,21 @@ module.exports = function() {
 		if(!result.delimiter) {
 			result.delimiter = guessDelimiter(sample, result.newlineStr, this.delimiters);
 		}
-		var hasHeaderData = hasHeader(sample, result.newlineStr, result.delimiter, result.quoteChar);
+		var parsedSample = parseSample(sample, result.newlineStr, result.delimiter, result.quoteChar);
 		if(options.hasHeader == undefined) {
-			var hasHeaderData = hasHeader(sample, result.newlineStr, result.delimiter, result.quoteChar);
+			var hasHeaderData = hasHeader(parsedSample);
 			result.hasHeader = hasHeaderData.hasHeader;
 			result.types = hasHeaderData.types;
 		} else {
 			result.hasHeader = options.hasHeader;
-			result.types = getTypes(sample.split(result.newlineStr), result.delimiter, result.quoteChar)[result.hasHeader ? 'tail' : 'all'];
+			result.types = getTypes(parsedSample)[result.hasHeader ? 'tail' : 'all'];
+		}
+		result.labels = (result.hasHeader && parsedSample.length > 0) ? parsedSample.slice(0, 1)[0] : null;
+		result.records = parsedSample;
+		if(result.hasHeader && result.records.length > 0) {
+			result.records.shift();
 		}
 		return result;
 	}
-
 	return CSVSniffer;
 };

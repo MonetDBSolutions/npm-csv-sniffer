@@ -16,12 +16,16 @@ var sniffer = new CSVSniffer();
 
 var sample = obtain_a_sample_somehow();
 
-sniffResult = sniffer.sniff(sample, {
-	newlineStr: params.newlineStr,
-	delimiter: params.delimiter,
-	quoteChar: params.quoteChar,
-	hasHeader: params.hasHeader
-});
+sniffResult = sniffer.sniff(sample);
+
+console.log("Sniff result: "+
+	"Newline string: "				+sniffResult.newlineStr+
+	"Delimiter: "					+sniffResult.delimiter+
+	"Quote character: " 			+sniffResult.quoteChar+
+	"First line contains labels: "	+sniffResult.hasHeader+
+	"Labels: "						+sniffResult.labels+
+	"# Records: "					+sniffResult.records.length
+);
 ```
 
 
@@ -29,26 +33,28 @@ sniffResult = sniffer.sniff(sample, {
 
 #### CSVSniffer(delims)
 The constructor of a CSV sniffer takes one optional argument: an array of possible column delimiters. 
-Auto detection will never propose a character outside of this set. If delims is not provided, auto detection
-might find any ASCII character to be a delimiter.
+Auto detection will never propose a character outside of this set. If delims is not provided, all
+ASCII characters are considered.
 
 #### CSVSniffer.sniff(sample, [options])
 This function is the only function in the CSVSniffer object. It operates based on the
 given options in the optional options object. Options that are not provided
 are attempted to be auto detected. Possible options:
 
-- newlineStr: Line separator in sample
-- delimiter: Column delimiter in sample (null or )
-- quoteChar: Quoting character in sample (null or empty string means no quote character)
-- hasHeader: Boolean indicating whether or not the first line in sample contains header labels.
+- newlineStr [string]: Line separator in sample
+- delimiter [string]: Column delimiter in sample (null or )
+- quoteChar [string]: Quoting character in sample (null or empty string means no quote character)
+- hasHeader [boolean]: Boolean indicating whether or not the first line in sample contains header labels.
              
-Returns object with the same properties as those found in the input, 
-auto filled in whenever they were missing. Whenever auto detection failed,
-null values are filled in. Note that this could be perfectly fine for e.g. 
-the quote character. 
-Furthermore, a types array is in the output, denoting the detected types of the columns.
-Also, a warning array is added in the output, possibly containing information
-on mismatches found during the sniffing between the supplied input and
-what was found during the sniffing.
+<a name="sniffresult"></a>**Returns object with the following properties:**
+
+- newlineStr [string]: If auto detected, will be one of "\r", "\n", "\r\n", "\n\r"
+- delimiter [string]: If auto detected, can be any ASCII character. Will be null if no delimiter was found.
+- quoteChar [string]: Can be either ' or " or null.
+- hasHeader [boolean]: true if first line is treated as header.
+- warnings [array]: Can contain some warnings that were generated during the sniffing. Will be empty in most cases.
+- types [array]: Contains the types of the columns. One of "string", "float", "integer".
+- labels [array]: Contains column labels, taken from the first line of the sample. If 'hasHeader' is false, this variable will be set to null.
+- records [array]: Contains the parsed data from the sample, using the information that was found during the sniffing process. This array of arrays will not contain the labels if 'hasHeader' evaluated to true.
 
 **Please report any suggestions/bugs to robin.cijvat@monetdbsolutions.com**
