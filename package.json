@@ -1,11 +1,11 @@
 {
   "name": "csv-sniffer",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Takes a sample of CSV text and tries to guess newline character, col delimiter, quote character, and whether or not the first row in the file contains labels",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MonetDB/npm-csv-sniffer"
+    "url": "git+https://github.com/MonetDB/npm-csv-sniffer.git"
   },
   "keywords": [
     "csv",
@@ -13,12 +13,17 @@
     "data",
     "import"
   ],
-   "author": {
+  "author": {
     "name": "R. Cijvat",
     "email": "robin.cijvat@monetdbsolutions.com"
   },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/MonetDB/npm-csv-sniffer/issues"
-  }
+  },
+  "readme": "# csv-sniffer\n[![Build Status](https://travis-ci.org/MonetDB/npm-csv-sniffer.svg)](https://travis-ci.org/MonetDB/npm-csv-sniffer)\n[![npm version](https://badge.fury.io/js/csv-sniffer.svg)](http://badge.fury.io/js/csv-sniffer)\n\nTakes a sample of CSV text and tries to guess newline character, col delimiter, quote character, and whether or not the first row in the file contains labels.\n\n# Installation\nnpm install [-g] csv-sniffer\n\n# Example usage\n\n```\nvar CSVSniffer = require(\"csv-sniffer\")();\n\nvar sniffer = new CSVSniffer();\n\nvar sample = obtain_a_sample_somehow();\n\nsniffResult = sniffer.sniff(sample);\n\nconsole.log(\"Sniff result: \"+\n\t\"Newline string: \"\t\t\t\t+sniffResult.newlineStr+\n\t\"Delimiter: \"\t\t\t\t\t+sniffResult.delimiter+\n\t\"Quote character: \" \t\t\t+sniffResult.quoteChar+\n\t\"First line contains labels: \"\t+sniffResult.hasHeader+\n\t\"Labels: \"\t\t\t\t\t\t+sniffResult.labels+\n\t\"# Records: \"\t\t\t\t\t+sniffResult.records.length\n);\n```\n\n\n# API\n\n#### CSVSniffer(delims)\nThe constructor of a CSV sniffer takes one optional argument: an array of possible column delimiters. \nAuto detection will never propose a character outside of this set. If delims is not provided, all\nASCII characters are considered.\n\n#### CSVSniffer.sniff(sample, [options])\nThis function is the only function in the CSVSniffer object. It operates based on the\ngiven options in the optional options object. Options that are not provided\nare attempted to be auto detected. Possible options:\n\n- newlineStr [string]: Line separator in sample\n- delimiter [string]: Column delimiter in sample (null or )\n- quoteChar [string]: Quoting character in sample (null or empty string means no quote character)\n- hasHeader [boolean]: Boolean indicating whether or not the first line in sample contains header labels.\n             \n<a name=\"sniffresult\"></a>**Returns object with the following properties:**\n\n- newlineStr [string]: If auto detected, will be one of \"\\r\", \"\\n\", \"\\r\\n\", \"\\n\\r\"\n- delimiter [string]: If auto detected, can be any ASCII character. Will be null if no delimiter was found.\n- quoteChar [string]: Can be either ' or \" or null.\n- hasHeader [boolean]: true if first line is treated as header.\n- warnings [array]: Can contain some warnings that were generated during the sniffing. Will be empty in most cases.\n- types [array]: Contains the types of the columns. One of \"string\", \"float\", \"integer\".\n- labels [array]: Contains column labels, taken from the first line of the sample. If 'hasHeader' is false, this variable will be set to null.\n- records [array]: Contains the parsed data from the sample, using the information that was found during the sniffing process. This array of arrays will not contain the labels if 'hasHeader' evaluated to true.\n\n**Please report any suggestions/bugs to robin.cijvat@monetdbsolutions.com**\n",
+  "readmeFilename": "README.md",
+  "homepage": "https://github.com/MonetDB/npm-csv-sniffer#readme",
+  "_id": "csv-sniffer@0.0.3",
+  "_from": "csv-sniffer@*"
 }

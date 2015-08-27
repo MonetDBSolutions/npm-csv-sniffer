@@ -298,7 +298,7 @@ function guessDelimiter(sample, newlineStr, delimiters) {
 	var nrLines = 0;
 	var newlinePos;
 	while((newlinePos = sample.indexOf(newlineStr, curCharIndex)) > -1) {
-		// for every line, we build an ascii table that keeps the number of occurences
+		// for every line, we build an ascii table that keeps the number of occurrences
 		var ascii = [];
 		for(var i=0; i<asciiMax-startAsciiAt; ++i) {
 			ascii.push(0); // all chars start with 0
@@ -341,8 +341,7 @@ function guessDelimiter(sample, newlineStr, delimiters) {
 			continue;
 		}
 		
-		// if we arrived here, we are sure that there are at least two entries
-		// in the frequency table for this character
+		// if we arrived here, we are sure that the character occurs at least once somewhere
 
 		//calculate max meta frequency, and also remember the corresponding frequency
 		var max = { freq: null, metaFreq: -Infinity };
@@ -376,7 +375,7 @@ function guessDelimiter(sample, newlineStr, delimiters) {
 	var decreaseStep = 0.01;
 	while(delims.length == 0 && consistency > threshold) {
 		modes.forEach(function(d, i) {
-			if(d.freq == 0 || d.mode <= 0) return;
+			if(d.maxFreq == 0 || d.mode <= 0) return;
 			var delim = String.fromCharCode(i+startAsciiAt);
 			if((d.mode / nrLines) >= consistency && (!delimiters || delimiters.indexOf(delim) > -1)) {
 				delims.push(delim);
@@ -629,9 +628,10 @@ module.exports = function() {
 		if(options.quoteChar === undefined) {
 			result.quoteChar = null;
 			var quoteAndDelim = guessQuoteAndDelimiter(sample, result.newlineStr, this.delimiters);
-			if(quoteAndDelim.delim) {
+			if(quoteAndDelim.delim && (quoteAndDelim.quote == "'" || quoteAndDelim.quote == '"')) {
 				result.quoteChar = quoteAndDelim.quote;
 				if(options.delimiter === undefined) {
+                    // only set result.delimiter if a valid quoteChar was found
 					result.delimiter = quoteAndDelim.delim;
 				} else if(options.delimiter !== quoteAndDelim.delim) {
 					result.warnings.push("Difference found in delimiters. User proposed "+options.delimiter+" but we believe it should be "+quoteAndDelim.delim);
