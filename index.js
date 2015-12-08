@@ -20,9 +20,6 @@
  *	  Our sniffer passes back labels and records
  */
 
-
-var fs = require('fs');
-
 function getNewlineStr(sample) {
 	// Figures out what the most probable row delimiter is. 
 	// It does this by registering the line lengths that would arise if a row delimiter
@@ -470,26 +467,26 @@ function parseSample(sample, newlineStr, delimiter, quotechar) {
     return result;
 }
 
+function getAccumulatedType(curValue, curType) {
+    // Note: If curType is "integer", this function will return the actual type of
+    // curValue
+    if(curType == "string") return "string"; //can't get worse than string
+
+    // see if we should fall back to string by seeing if this is a finite number
+    if(!isFinite(curValue)) return "string";
+
+    // see if we should fall back from int to float
+    if(curType == "float" || curValue%1 !== 0) return "float";
+
+    return "integer";
+}
+
 function getTypes(parsedSample) {
 	// Parses all lines in the lines array and determines the type of all the columns.
 	// Returns three type arrays:
 	// - Types considering all rows
 	// - Types considering all but the first row
 	// - Types considering only the first row
-
-    function getAccumulatedType(curValue, curType) {
-    	// Note: If curType is "integer", this function will return the actual type of
-    	// curValue
-    	if(curType == "string") return "string"; //can't get worse than string
-		
-		// see if we should fall back to string by seeing if this is a finite number
-		if(!isFinite(curValue)) return "string";
-
-		// see if we should fall back from int to float
-		if(curType == "float" || curValue%1 !== 0) return "float";
-
-		return "integer";
-    }
 
     var firstValues = null; // used to calculate the all array in the end
     var first = [];
@@ -499,7 +496,7 @@ function getTypes(parsedSample) {
     parsedSample && parsedSample.forEach(function(cols, i) {
     	if(i == 0) {
     		firstValues = cols;
-    		cols.forEach(function(col, colIndex) {
+    		cols.forEach(function(col) {
     			first.push(getAccumulatedType(col, "integer"));
     			tail.push("integer");
     		});
@@ -611,6 +608,15 @@ module.exports = function() {
 	function CSVSniffer(delims) {
 		this.delimiters = delims;
 	}
+
+    // Expose the function used to accumulate the types to the outside world.
+    // Given a current type, and a value, it returns the accumulated type.
+    // For example, if the curType is integer and the curValue is 4.4, the result
+    // will be float. If curValue in this case would be a string, the result would be a string.
+    CSVSniffer.prototype.getAccumulatedType = function(curValue, curType) {
+        return getAccumulatedType(curValue, curType);
+    };
+
 
 	// Sniff the given sample, using the given options. See documentation for exact options.
 
