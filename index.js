@@ -565,7 +565,7 @@ function hasHeader(parsedSample) {
     var types = getTypes(parsedSample);
 	// All types and lengths are known, let every col bring out a vote.
 	// Whenever the type of the header col differs from the type of the rest of
-	// the column (and type of first row is string), this vote is +1. Otherwise, we use the values in the 
+	// the column (and type of first row is string), this vote is +2. Otherwise, we use the values in the
 	// lengths array to calculate the average and the standard deviation of these
 	// lengths. The vote then depends on how close/far it is from the 
 	// average. Close to average means negative vote, far from average means positive
@@ -574,7 +574,7 @@ function hasHeader(parsedSample) {
 	firstValues && firstValues.forEach(function(col, i) {
 		if(types.first[i] != types.tail[i] && types.first[i] == "string") {
 			// Yup, first row has different type
-			return ++vote;
+			return vote += 2;
 		}
 		var sum = 0;
 		lengthsTail[i].forEach(function(d) { sum += d; });
